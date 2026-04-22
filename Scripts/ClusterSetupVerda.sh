@@ -12,11 +12,16 @@ set -euo pipefail
 #   4. Installs liqoctl and Liqo
 #   5. Exports kubeconfig with public IP
 #   6. Optionally installs NVIDIA toolkit for GPU support
+#   7. Installs NVIDIA device plugin with correct runtimeClassName
+#   8. Fixes TLS certificate for public IP access
 #
 # After this script runs, you still need to:
 #   - Transfer cluster-b.yaml to cPouta
 #   - Run liqoctl peer from cPouta
 #   - Run liqoctl offload commands from cPouta
+#   - Patch ResourceSlice: kubectl patch resourceslice cluster-b -n liqo-tenant-cluster-b --type=merge -p '{"spec":{"resources":{"nvidia.com/gpu":"1"}}}'
+#   - Label virtual node: kubectl label node cluster-b nvidia.com/gpu=true
+#   - For GPU support: ENABLE_NVIDIA_TOOLKIT=true ./ClusterSetupVerda.sh
 #
 # Usage: Run as root on a fresh Ubuntu 24.04 VM on Verda
 # ======================================================
