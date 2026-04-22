@@ -134,6 +134,16 @@ sed -i "s|server: https://127.0.0.1:6443|server: https://${PUBLIC_IP}:6443|" /ro
 
 log "kubeconfig exported to /root/cluster-b.yaml with public IP"
 
+# ===== Fix TLS certificate for public IP access =====
+# k3s generates a self-signed certificate for 127.0.0.1 by default.
+# When connecting via public IP, certificate validation fails.
+# This disables TLS verification so cPouta can connect without errors.
+log "Disabling TLS verification for public IP access..."
+kubectl config set-cluster default --insecure-skip-tls-verify=true
+cp /root/.kube/config /root/cluster-b.yaml
+sed -i "s|server: https://127.0.0.1:6443|server: https://${PUBLIC_IP}:6443|" /root/cluster-b.yaml
+chmod 600 /root/cluster-b.yaml
+
 # ===== Done =====
 touch "$MARKER"
 
