@@ -144,6 +144,22 @@ cp /root/.kube/config /root/cluster-b.yaml
 sed -i "s|server: https://127.0.0.1:6443|server: https://${PUBLIC_IP}:6443|" /root/cluster-b.yaml
 chmod 600 /root/cluster-b.yaml
 
+# ===== Install NVIDIA device plugin (GPU support) =====
+# The standard device plugin yaml does not work with k3s because it runs
+# with the default container runtime instead of the NVIDIA runtime.
+# Fix: download the yaml and add runtimeClassName: nvidia to the pod spec.
+# Without this, the plugin cannot find the NVML library (libnvidia-ml.so.1)
+# and the GPU is not advertised to Kubernetes.
+if [ "$ENABLE_NVIDIA_TOOLKIT" = "true" ]; then
+    log "Installing NVIDIA device plugin with runtimeClassName fix..."
+    curl -o /tmp/nvidia-device-plugin.yml \
+        https://raw.githubusercontent.com/NVIDIA/k8s-device-plugin/v0.14.1/nvidia-device-plugin.yml
+    sed -i 's/priorityClassName: "system-node-critical"/priorityClassName: "system-node-critical"\n      runtimeClassName: nvidia/' \
+        /tmp/nvidia-device-plugin.yml
+    kubectl apply -f /tmp/nvidia-device-plugin.yml
+    log "NVIDIA device plugin installed."
+fi
+
 # ===== Done =====
 touch "$MARKER"
 
