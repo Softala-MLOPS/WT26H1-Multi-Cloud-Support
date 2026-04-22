@@ -84,7 +84,7 @@ if ! systemctl is-active --quiet k3s 2>/dev/null; then
     # Configure NVIDIA runtime for k3s if toolkit is installed
     if [ "$ENABLE_NVIDIA_TOOLKIT" = "true" ] && [ -d /var/lib/rancher/k3s/agent/etc/containerd ]; then
         log "Configuring NVIDIA runtime for k3s..."
-        cat > /var/lib/rancher/k3s/agent/etc/containerd/config.toml.tmpl <<'CT'
+        cat > /var/lib/rancher/k3s/agent/etc/containerd/config.toml.tmpl <<CT
 [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.nvidia]
   runtime_type = "io.containerd.runc.v2"
   [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.nvidia.options]
