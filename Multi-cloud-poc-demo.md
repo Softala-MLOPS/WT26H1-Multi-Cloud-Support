@@ -1,5 +1,5 @@
 # Multi-cloud demo
-This is a step-by-step guide for connecting an external k3s cluster to Oss-mlops-platforms k8s cluster running on my CSC cPouta vm. The goal of this demo is to work as an proof of concept for offloading workloads from Oss-mlops-platform ml development pipeline to an external cluster which is located on seperate VM on a different cloud provider. This is achieved with connecting the two clusters with Liqo. Liqo also handles:
+This is a step-by-step guide for connecting an external k3s cluster to Oss-mlops-platforms k8s cluster running on a CSC cPouta vm. The goal of this demo is to work as a proof of concept for offloading workloads from Oss-mlops-platform ml development pipeline to an external cluster which is located on seperate VM on a different cloud provider. This is achieved with connecting the two clusters with Liqo. Liqo also handles:
 * Vpn tunnel for intercluster connections.
 * Setup and management of a virtual node.
 * Namespace extending between nodes.
