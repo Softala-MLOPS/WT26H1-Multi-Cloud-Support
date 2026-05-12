@@ -15,14 +15,38 @@
 * Migrate fmnist GPU pipeline to KFP v2: https://github.com/OSS-MLOPS-PLATFORM/demo-fmnist-mlops-pipeline
   - The fmnist pipeline was written for KFP v1 but the platform runs KFP v2.5.0. The pipeline needs to be rewritten using the KFP v2 SDK before it can run on this platform.
 * The inference step in the pipeline uses `istio-ingressgateway.istio-system.svc.cluster.local`. If testing the full pipeline including inference, also offload `istio-system` namespace with the same Local strategy.
-* Automate GPU resource advertising in Liqo: currently the ResourceSlice patch and virtual node label must be applied manually after every new peering. Investigate whether Liqo can be configured to automatically include extended resources (GPUs) in the ResourceSlice.
-* Investigate how Auto Scaling can be added to the system. This can include:
-  - How does the system detect and decide when to scale?
-  - Provisioning and creating new VM´s upon gpu / cpu load requirements.
-  - Renting a Vm instance with automaticly scaling recourses by scaling and limiting the computing capacity of nodes. This can maby be done with Liqo ResourceSlice virtual nodes on consumer. You can assert the virtual nodes computing capacity even though truely capacity is greater.
-  - A naming system for multiple VM´s, clusters, nodes and CIDR provisioning for non-overlapping addresses with different machines and clusters.
-* Investigate how to add automatic shut down and deletion for joined VM after determined time of provider node idle.
-  - Do all created Vm´s have the same time of idle or does the potential idle time scale with somehow with the amount of instances active and idling.
-  - Should the shutdown time be easily customizable by mlops user / admin
-* Investigate how to create a safe de-coupling and uninstalling script of the joined clusters to ensure succesful rejoining of clusters. (liqo specific problem). **Note from WT 26H1:** We experienced issues with stale peering state when doing unpeer/repeer cycles. The tenant namespace can get stuck in Terminating state. The workaround is to remove finalizers manually and force-delete the namespace. A clean uninstall/reinstall of Liqo on the consumer side resolves the issue completely. Additionally, a stale nonce secret (`liqo-signed-nonce`) in `liqo-tenant-cluster-b` must be deleted before re-peering a new VM with the same cluster-id.
-* Remote cluster is set up with k3s at the moment. Investigate if there is need for k8s. If the k3s doesn't have enough resources then modify the instructions to be compatible with k8s. Liqo can be deployed both k3s and k8s clusters.
+* Automated GPU VM lifecycle via polling script (investigated in WT 26H1): The goal is to automatically detect when a GPU workload is needed, spin up a Verda VM, run the training, and delete the VM when done, saving credits when idle. The recommended approach is Create/Delete VM each time (rather than Stop/Start) since it has zero idle cost, always starts fresh. Automatedverda.sh could also include the automation of fixing the stale nonce and setup time.
+
+Detection: A Python polling script runs on cPouta, watching the kubeflow namespace for pods stuck in Pending state with the event message Insufficient nvidia.com/gpu. The VM is only created when a GPU pod is actually waiting.
+Likely implementation flow:
+
+1. Polling script detects a pending GPU pod (kubectl get events -n kubeflow --field-selector reason=FailedScheduling | grep nvidia.com/gpu)
+2. Call Verda API to get an OAuth2 access token (POST /v1/oauth2/token with client_id and client_secret)
+3. Call Verda API to create a GPU VM (POST /v1/instances with instance_type, image, ssh_key_ids, hostname, location_code)
+4. Poll Verda API until VM status is running and get its public IP (GET /v1/instances/{instance_id})
+5. Run setup-verda.sh <ip> <ssh_key> --gpu to peer the clusters and configure GPU
+6. Pod gets scheduled on the Verda GPU node and training runs
+7. Polling script detects training pod has completed
+8. Call Verda API to delete the VM (PUT /v1/instances with action: delete) — zero idle credits consumed
+
+
+Language: Python, using the official Verda Python SDK (https://github.com/verda-cloud/sdk-python) for API calls and subprocess for kubectl commands.
+To implement: Requires Verda API credentials (client_id and client_secret from Verda console → Keys → Cloud API Credentials), the exact GPU instance type name, and the SSH key ID registered on Verda.
+
+
+Investigate how Auto Scaling can be added to the system. This can include:
+
+How does the system detect and decide when to scale?
+Provisioning and creating new VM´s upon gpu / cpu load requirements.
+Renting a Vm instance with automaticly scaling recourses by scaling and limiting the computing capacity of nodes. This can maby be done with Liqo ResourceSlice virtual nodes on consumer. You can assert the virtual nodes computing capacity even though truely capacity is greater.
+A naming system for multiple VM´s, clusters, nodes and CIDR provisioning for non-overlapping addresses with different machines and clusters.
+
+
+Investigate how to add automatic shut down and deletion for joined VM after determined time of provider node idle.
+
+Do all created Vm´s have the same time of idle or does the potential idle time scale with somehow with the amount of instances active and idling.
+Should the shutdown time be easily customizable by mlops user / admin
+
+
+Investigate how to create a safe de-coupling and uninstalling script of the joined clusters to ensure succesful rejoining of clusters. (liqo specific problem). Note from WT 26H1: We experienced issues with stale peering state when doing unpeer/repeer cycles. The tenant namespace can get stuck in Terminating state. The workaround is to remove finalizers manually and force-delete the namespace. A clean uninstall/reinstall of Liqo on the consumer side resolves the issue completely. Additionally, a stale nonce secret (liqo-signed-nonce) in liqo-tenant-cluster-b must be deleted before re-peering a new VM with the same cluster-id.
+Remote cluster is set up with k3s at the moment. Investigate if there is need for k8s. If the k3s doesn't have enough resources then modify the instructions to be compatible with k8s. Liqo can be deployed both k3s and k8s clusters.
